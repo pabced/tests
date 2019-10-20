@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Ejercicio 02</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    </head>
+    <body
+        <div class="container">
+            <div id="line_chart" style="width:1000px"></div>
+            <div id="pie_chart" style="width: 1000px"></div>
+        </div>
+    </body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
+</html>
+
+<script type="text/javascript">
+  $(document).ready(function(){
+
+    var arrDates = new Set();
+    var arrData = [];
+
+    $.getJSON('/get_data_serie01', function() {
+        console.log( "success get_data_serie_01" );
+      })
+      .done(function(data) {
+          var date;
+          $.each(data, function (i, item) {
+            date = moment(item.d).format("YYYY-MM-DD");
+            arrData.push(
+              {
+                catName: item.cat.toUpperCase(),
+                date: date,
+                value: item.value
+              }
+            );
+            arrDates.add(date);
+          });
+
+          processData();
+      })
+      .fail(function(jqxhr, textStatus, error ) {
+        var err = textStatus + ", " + error;
+        console.log( "Request Failed: " + err );
+      });
+
+    $.getJSON('/get_data_serie02', function() {
+        console.log( "success get_data_serie_02" );
+      })
+      .done(function(data) {
+          $.each(data, function (i, item) {
+            arrData.push(
+              {
+                catName: item.categ.toUpperCase(),
+                date: item.myDate,
+                value: item.val
+              }
+            );
+            arrDates.add(item.myDate);
+          });
+          processData();
+      })
+      .fail(function(jqxhr, textStatus, error ) {
+        var err = textStatus + ", " + error;
+        console.log( "Request Failed: " + err );
+      });
+
+    $.getJSON('/get_data_serie03', function() {
+        console.log( "success get_data_serie_03" );
+      })
+      .done(function(data) {
+          var regex_for_date = /\d{4}-\d{2}-\d{2}/g;
+          var regex_for_cat = /#(.*?)#/g;
+          var auxDate;
+          $.each(data, function (i, item) {
+            auxDate = item.raw.match(regex_for_date)[0]
+            arrData.push(
+              {
+                catName: (item.raw.match(regex_for_cat)[0]).replace(/#/g,'').toUpperCase(),
+                date: auxDate,
+                value: item.val
+              }
+            );
+            arrDates.add(auxDate);
+          });
+          processData();
+      })
+      .fail(function(jqxhr, textStatus, error ) {
+        var err = textStatus + ", " + error;
+        console.log( "Request Failed: " + err );
+      });
+
+    function processData(){
+
+      var axis = Array.from(arrDates).sort();
+      var dataCategories = _.groupBy(_.sortBy(arrData, 'date'), 'catName');
+      var lstCategories = _.keys(dataCategories).sort();
+      var series = [];
+      series['lineChart'] = [];
+      series['pieChart'] = [];
+
+      _.each(lstCategories, function(itemCategory) {
+        var catValues = _.map(_.range(axis.length), function () { return 0.00; });
+        var indexValue;
+          _.each(dataCategories[itemCategory], function(item) {
+            indexValue = axis.indexOf(item.date);
+            catValues[indexValue] += item.value;
+          });
+
+          series['lineChart'].push({
+              name: itemCategory,
+              data: catValues
+          });
+
+          series['pieChart'].push({
+            name: itemCategory,
+            y: _.reduce(catValues, function(a, b){ return a + b; }, 0)
+          });
+
+      });
+
+      lineChart(axis, series['lineChart']);
+
+      pieChart(series['pieChart']);
+
+    }
+
+    function lineChart(axis, series){
+      Highcharts.chart('line_chart', {
+          chart: {
+            type: 'line',
+            width: 1000
+          },
+          title: {
+              text: 'lineChart Categorías'
+          },
+          xAxis: {
+            categories: axis
+          },
+          yAxis: {
+              plotLines: [{
+                  value: 0,
+                  width: 1,
+                  color: '#808080'
+              }]
+          },
+          legend: {
+              layout: 'vertical',
+              align: 'right',
+              verticalAlign: 'middle',
+              borderWidth: 0
+          },
+          series: series
+      });
+    }
+
+    function pieChart(series){
+      Highcharts.chart('pie_chart', {
+          chart: {
+              plotBackgroundColor: null,
+              plotBorderWidth: null,
+              plotShadow: false,
+              type: 'pie'
+          },
+          title: {
+              text: 'pieChart Categorías'
+          },
+          tooltip: {
+              pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
+          },
+          plotOptions: {
+              pie: {
+                  allowPointSelect: true,
+                  cursor: 'pointer',
+                  dataLabels: {
+                      enabled: true,
+                      format: '<b>{point.name}</b>: {point.percentage:.1f} %'
+                  }
+              }
+          },
+          series: [{
+              name: 'Categorías',
+              colorByPoint: true,
+              data: series
+          }]
+      });
+    }
+
+});
+</script>
+</html>
